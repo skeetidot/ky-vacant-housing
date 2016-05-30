@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset=utf-8 />
+    <title>Vacant Housing in Kentucky</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+
+    <!-- Add JQuery, Leaflet, and Simple Statistics JavaScript libraries -->
+    <script src="https://code.jquery.com/jquery-1.12.2.min.js"></script>
+    <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-statistics/1.0.1/simple_statistics.js"></script>
+
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css" />
+    <link href='http://fonts.googleapis.com/css?family=Lato' rel='stylesheet' type='text/css'>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: whitesmoke;
+            font-family: Lato, sans-serif;
+            color: #0D0000;
+        }
+        
+        header {
+            width: 80%;
+            margin: 10px auto 10px auto;
+        }
+        
+        h1 {
+            display: inline-block;
+            margin-right: 20px;
+            color: #001323;
+        }
+        
+        h2 {
+            display: inline-block;
+            color: #001323;
+        }
+        
+        #map {
+            width: 80%;
+            height: 540px;
+            margin: 10px 10%;
+            background: whitesmoke;
+            border: 2px solid #dddedf;
+        }
+        
+        footer {
+            padding: 6px 10%;
+            width: 80%;
+        }
+        
+        p {
+            font-size: 1em;
+            color: #001323;
+        }
+        
+        .legend {
+            padding: 6px 8px;
+            font-size: 1em;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            max-width: 230px;
+        }
+        
+        .legend h3 {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #001323;
+            margin: 0 0 10px 0;
+        }
+        
+        .legend span {
+            width: 20px;
+            height: 20px;
+            float: left;
+            margin: 0 10px 4px 0;
+        }
+        
+        .legend label {
+            font-size: 1.1em;
+        }
+        
+        .legend label:after {
+            content: '';
+            display: block;
+            clear: both;
+        }
+        
+        .leaflet-popup-content {
+            max-width: 160px;
+        }
+        
+        .leaflet-popup-content h3 {
+            margin: 0;
+        }
+        
+        .info {
+            padding: 6px 8px;
+            font-size: 1em;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            text-align: right;
+        }
+        
+        .info h3 {
+            margin: 0;
+        }
+        
+        #ui-controls {
+            margin-left: 10%;
+        }
+        
+        #ui-controls label {
+            font-size: 1em;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Vacant Housing in Kentucky</h1>
+    </header>
+    
+    <!-- Build the dropdown to select the data attribute-->
+    <div id='ui-controls'>
+        <label>Choose a data attribute:</label>
+        <select id="vacant">
+            <option value="VACANT_FOR" selected>Vacant, for rent</option>
+            <option value="VACANT_FO2">Vacant, for sale</option>
+            <option value="VACANT_SEA">Vacant, used seasonally or recreationally</option>
+            <option value="VACANT_MIG">Vacant, used by migratory workers</option>
+            <option value="VACANT_SOL">Vacant, solely unoccupied</option>
+            <option value="VACANT_OTH">Vacant, other</option>
+        </select>
+    </div>
+
+    <div id='map'></div>
+
+    <footer>
+        <p>Map authored by Lauren Winkler</p>
+
+        <p>This map allows you to explore various types of vacant housing in Kentucky. These data were obtained through <a href="http://factfinder.census.gov/" target="_blank">American Fact Finder</a>; 2010 Census, SF1 and have been aggregated by county.</p>
+
+        <p>Select an attribute from the dropdown to explore its prevalence across the state. Click a county to view its name and percentage of the selected vacant housing attribute, or hover over a county to view the total number of each type of vacant housing in that county.</p>
+
+    </footer>
+
+    <script>
+        // Set initial options for the map
+        var options = {
+            center: [37.8, -85.8], // centered in Kentucky
+            zoom: 7.4,
+            minZoom: 7.4,
+            maxZoom: 7.4,
+            dragging: false, // disable panning
+            zoomControl: false // disable zooming
+        }
+
+        // Create a new Leaflet map, passing map options, and assign it to the map variable
+        var map = L.map('map', options);        
+
+        // Define global variables for the Leaflet geoJson data layer, the mapped attribute, the normalization attribute, and the county name
+        var dataLayer, // Leaflet GeoJson layer
+            attribute = "VACANT_FOR", // assign attribute variable for choropleth map: housing units which are vacant and for rent
+            norm = "VACANT"; // assign normalization variable for choropleth map: total number of vacant housing units
+            county = "NAME"; // county name        
+
+        // Create the labels object to store meaningful labels for each attribute
+        var labels = {
+            "VACANT": "vacant units",
+            "VACANT_FOR": "% vacant housing units for rent",
+            "VACANT_FO2": "% vacant housing units for sale",
+            "VACANT_SEA": "% vacant housing units used seasonally or recreationally",
+            "VACANT_MIG": "% vacant housing units used for migratory workers",
+            "VACANT_SOL": "% vacant housing units, solely unoccupied",
+            "VACANT_OTH": "% other vacant housing units",
+        }
+
+        //Use JQuery's getJSON() method to load the ky_counties_housing.json data via AJAX (asynchronously, load data after the page loads to improve performance)
+        $.getJSON("ky_counties_housing.json", function (data) {
+
+            // Use Leaflet geoJson() method to add the GeoJSON data to the map and assign it to the dataLayer global variable
+            dataLayer = L.geoJson(data, {
+
+                // Create an initial style for each feature
+                style: function (feature) {
+                    return {
+                        color: '#dddddd', // set stroke color
+                        weight: 2, // set stroke weight
+                        fillOpacity: 1, // override default fill opacity
+                        fillColor: '#1f78b4' // set fill color
+                    };
+                }
+            }).addTo(map); // add the Leaflet GeoJson layer to the map
+
+            // Call the function to draw the initial empty legend
+            drawLegend();
+
+            // Call the function to draw the initial map and populate the legend
+            drawMap();
+
+            // Call the function to draw the empty info panel and hide it until the user mouses over a county
+            drawInfo();
+
+            // Call the function to determine the selected attribute from the dropdown and redraw the map
+            buildUI();
+
+        });
+
+        // Draw the map
+        // Get the class breaks based on the ckmeans classification method
+        // Loop through each county and:
+        // 1. Set its color based on which cluster its normalized attribute falls into
+        // 2. Build and bind its popup
+        // 3. Add an event listener so that when the user mouses over a county, update the info panel with the data for the selected county and highlight the selected county
+        // 4. Add another event listener so that when the user mouses off of a county, hide the info panel and remove the highlight by restoring the original stroke color and weight
+        // Update the legend based on the break points for the currently selected attribute
+        function drawMap() {
+
+            // Call the getClassBreaks() function to determine class breaks and assign return them to the breaks variable
+            var breaks = getClassBreaks();
+
+            // Loop through each county (layer) in the GeoJson layer
+            dataLayer.eachLayer(function (layer) {
+
+                // Create a shorthand variable to access layer properties
+                var props = layer.feature.properties;
+
+                // Set the county's fill color, calling the getColor() method to determine the appropriate color based on the normalized attribute
+                layer.setStyle({
+                    fillColor: getColor(props[attribute] /
+                        props[norm], breaks)
+                });
+
+                // Build the popup with the county name, normalized attribute, and readable attribute label and bind the popup to the county
+                layer.bindPopup("<h3>" + props[county] + " County</h3>" +
+                    ((props[attribute] / props[norm]) * 100).toLocaleString() + labels[attribute]);
+
+                // When the user hovers over a county (layer)
+                layer.on('mouseover', function () {
+
+                    // Call the updateInfo() function to update the info panel with the name and housing attributes for the selected county
+                    updateInfo(this); // "this" is the county (layer) being hovered over
+
+                    // Bring the selected county to the front of the layer order and highlight it by updating its stroke color and stroke weight
+                    layer.bringToFront()
+                    layer.setStyle({
+                        color: 'red', // set highlight stroke color
+                        opacity: .9, // set highlight stroke opacity to 90%
+                        weight: 4 // set highlight stroke weight
+                    });
+
+                });
+
+            });
+
+            // When the user hovers over any county in Kentucky
+            dataLayer.on('mouseover', function () {
+                
+                // Use the JQuery show() method to show the info panel <div>
+                $(".info").show();
+                
+            });
+
+            // When the user hovers off of a county (or outside of Kentucky)
+            dataLayer.on('mouseout', function () {
+                
+                // Use the JQuery hide() method to hide the info panel <div>
+                $(".info").hide();
+
+                // Remove the feature highlighting by resetting the county stroke color and weight to their initial values
+                dataLayer.setStyle({
+                    color: '#dddddd', // restore initial stroke color
+                    weight: 2 // restore initial stroke weight
+                });
+
+            });
+
+            // Call the function to update the legend based on the break points for the currently selected attribute
+            updateLegend(breaks);
+        }
+
+        // Determine the normalized values and establish classification breaks
+        function getClassBreaks() {
+
+            // Create an empty array to store the normalized values
+            var values = [];
+
+            // Loop through each county to get its normalized attribute
+            dataLayer.eachLayer(function (layer) {
+
+                // Calculate the normalized value (attribute to map / normalization attribute)
+                var value = layer.feature.properties[attribute] / layer.feature.properties[norm];
+
+                // Push each normalized value into the array
+                values.push(value);
+            });
+
+            // Use Simple Statistics to determine 5 class ranges of statistically similar values, sorted in ascending order (5 arrays of values)
+            var clusters = ss.ckmeans(values, 5);
+
+            // Use the JavaScript map() method to create a 2-dimensional array of the break points (lowest and highest values) in each cluster
+            // The lowest value in each cluster is cluster[0]; the highest value is cluster.pop()
+            var breaks = clusters.map(function (cluster) {
+                return [cluster[0], cluster.pop()];
+            });
+
+            // Return the array of class break arrays, e.g. [[0.24,0.25], [0.26, 0.37], etc]
+            return breaks;
+
+        }
+
+        // Set the color of the features depending on which cluster the value falls into. The function accepts a single normalized data attribute and the class breaks 2-dimensional array and uses a series of conditional statements to determine which color value to return to the function caller.
+        function getColor(d, breaks) {
+
+            // If the normalized data value <= the upper value of the first cluster
+            if (d <= breaks[0][1]) {
+                return '#f1eef6';
+
+            // Otherwise, if the normalized data value <= the upper value of the second cluster    
+            } else if (d <= breaks[1][1]) {
+                return '#bdc9e1';
+
+            // Otherwise, if the normalized data value <= the upper value of the third cluster   
+            } else if (d <= breaks[2][1]) {
+                return '#74a9cf';
+
+            // Otherwise, if the normalized data value <= the upper value of the fourth cluster   
+            } else if (d <= breaks[3][1]) {
+                return '#2b8cbe';
+
+            // Otherwise, if the data value <= the upper value of the fifth cluster  
+            } else if (d <= breaks[4][1]) {
+                return '#045a8d';
+            }
+        }
+
+        // Create the empty legend    
+        function drawLegend() {
+
+            // Create a new Leaflet control object, and position it top left
+            var legend = L.control({
+                position: 'topleft'
+            });
+
+            // When the empty legend control is added to the map
+            legend.onAdd = function () {
+
+                // Create a new HTML <div> element and give it a class name of "legend"
+                var div = L.DomUtil.create('div', 'legend');
+
+                // Return the legend <div> element to be added to the map   
+                return div;
+
+            };
+
+            // Add the legend to the map
+            legend.addTo(map);
+        }
+
+        // Build the user interface to:
+        // Select the #ui-controls <div> and add an event listener for when the user changes the attribute dropdown selection
+        // When the user selects a new dropdown value:
+        // 1. Assign it as the new mapped attribute
+        // 2. Redraw the map with the newly selected attribute
+        function buildUI() {
+
+            // Use the JQuery change() method to listen for a change in the vacant dropdown
+            $('select[id="vacant"]').change(function () {
+
+                // Use the JQuery select $() and val() methods to determine the value of the selected dropdown option and assign it as the new mapped attribute
+                attribute = $(this).val();
+
+                // Redraw the map with the newly selected attribute
+                drawMap();
+
+            });
+
+        }
+
+        // Update the legend. Select the legend <div> and repopulate it with the legend for the currently selected attribute.
+        function updateLegend(breaks) {
+
+            // Use the JQuery select $() method to select the legend <div> and assign it to the new legend variable
+            var legend = $('.legend');
+
+            // Use the JQuery html() method to clear the existing contents in the legend <div> and add an <h3> heading tag to the legend <div> that displays the readable value from the labels object for the currently selected attribute (i.e., the mapped phenomena)
+            legend.html("<h3>" + labels[attribute] + "</h3>");
+
+            // For each of the class breaks
+            for (var i = 0; i < breaks.length; i++) {
+
+                // Determine the color associated with each break value, using the lower range value
+                var color = getColor(breaks[i][0], breaks);
+
+                // Use the JQuery append() method to add a <span> tag to the legend <div> that is styled with the color for that particular class and a <label> with the low and high range values of that particular class
+                legend.append(
+                    '<span style="background:' + color + '"></span> ' +
+                    '<label>' + (breaks[i][0] * 100).toLocaleString() + ' &mdash; ' +
+                    (breaks[i][1] * 100).toLocaleString() + '% </label>');
+            }
+
+        }
+
+        // Draw an empty info panel and hide it, so that it won't appear until the user hovers over a county
+        function drawInfo() {
+
+            // Create a new Leaflet control object, and position it top right
+            var info = L.control({
+                position: 'topright'
+            });
+
+            // When the empty info panel control is added to the map
+            info.onAdd = function (map) {
+
+                // Create a new HTML <div> element and give it a class name of "info"
+                var div = L.DomUtil.create('div', 'info');
+
+                // Return the info <div> element to be added to the map
+                return div;
+
+            }
+
+            // Add the empty info panel to the map
+            info.addTo(map);
+
+            // Use the JQuery hide() method to hide the empty info panel, so that it won't appear until the user hovers over a county
+            $(".info").hide();
+
+        }
+
+        // Update the info panel based on the selected county (layer)
+        function updateInfo(layer) {
+
+            // Create a shorthand variable to access layer properties
+            var props = layer.feature.properties;
+
+            // Build the HTML for the info panel containing the selected county's name and its raw (non-normalized) housing attributes
+            var html = "<h3>" + props.NAME + " County</h3>" +
+                "total # vacant units: <b>" + props.VACANT + "</b><br>" +
+                "# vacant, for rent: <b>" + props.VACANT_FOR + "</b><br>" +
+                "# vacant, for sale: <b>" + props.VACANT_FO2 + "</b><br>" +
+                "# vacant, used seasonally or recreationally: <b>" + props.VACANT_SEA + "</b><br>" +
+                "# vacant, used by migratory workers: <b>" + props.VACANT_MIG + "</b><br>" +
+                "# vacant, solely unoccupied: <b>" + props.VACANT_SOL + "</b><br>" +
+                "# vacant, other: <b>" + props.VACANT_OTH + "</b>";
+
+
+            // Use the JQuery select $() and html() methods to select the info <div>, clear its existing contents, and fill it with the HTML data for the selected county
+            $(".info").html(html);
+        }
+    </script>
+
+</body>
+
+</html>
