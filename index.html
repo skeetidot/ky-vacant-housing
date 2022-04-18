@@ -6,13 +6,19 @@
     <title>Vacant Housing in Kentucky</title>
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
 
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+        integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+        crossorigin="" />
+    <link href='http://fonts.googleapis.com/css?family=Lato' rel='stylesheet' type='text/css'>
+
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+        crossorigin=""></script>
+
     <!-- Add JQuery, Leaflet, and Simple Statistics JavaScript libraries -->
     <script src="https://code.jquery.com/jquery-1.12.2.min.js"></script>
-    <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-statistics/1.0.1/simple_statistics.js"></script>
-
-    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css" />
-    <link href='http://fonts.googleapis.com/css?family=Lato' rel='stylesheet' type='text/css'>
 
     <style>
         body {
@@ -22,23 +28,23 @@
             font-family: Lato, sans-serif;
             color: #0D0000;
         }
-        
+
         header {
             width: 80%;
             margin: 10px auto 10px auto;
         }
-        
+
         h1 {
             display: inline-block;
             margin-right: 20px;
             color: #001323;
         }
-        
+
         h2 {
             display: inline-block;
             color: #001323;
         }
-        
+
         #map {
             width: 80%;
             height: 540px;
@@ -46,17 +52,17 @@
             background: whitesmoke;
             border: 2px solid #dddedf;
         }
-        
+
         footer {
             padding: 6px 10%;
             width: 80%;
         }
-        
+
         p {
             font-size: 1em;
             color: #001323;
         }
-        
+
         .legend {
             padding: 6px 8px;
             font-size: 1em;
@@ -65,39 +71,39 @@
             border-radius: 5px;
             max-width: 230px;
         }
-        
+
         .legend h3 {
             font-size: 1.1em;
             font-weight: bold;
             color: #001323;
             margin: 0 0 10px 0;
         }
-        
+
         .legend span {
             width: 20px;
             height: 20px;
             float: left;
             margin: 0 10px 4px 0;
         }
-        
+
         .legend label {
             font-size: 1.1em;
         }
-        
+
         .legend label:after {
             content: '';
             display: block;
             clear: both;
         }
-        
+
         .leaflet-popup-content {
             max-width: 160px;
         }
-        
+
         .leaflet-popup-content h3 {
             margin: 0;
         }
-        
+
         .info {
             padding: 6px 8px;
             font-size: 1em;
@@ -106,15 +112,15 @@
             border-radius: 5px;
             text-align: right;
         }
-        
+
         .info h3 {
             margin: 0;
         }
-        
+
         #ui-controls {
             margin-left: 10%;
         }
-        
+
         #ui-controls label {
             font-size: 1em;
             margin-right: 5px;
@@ -126,7 +132,7 @@
     <header>
         <h1>Vacant Housing in Kentucky</h1>
     </header>
-    
+
     <!-- Build the dropdown to select the data attribute-->
     <div id='ui-controls'>
         <label>Choose a data attribute:</label>
@@ -145,9 +151,13 @@
     <footer>
         <p>Map authored by Lauren Winkler</p>
 
-        <p>This map allows you to explore various types of vacant housing in Kentucky. These data were obtained through <a href="http://factfinder.census.gov/" target="_blank">American Fact Finder</a>; 2010 Census, SF1 and have been aggregated by county.</p>
+        <p>This map allows you to explore various types of vacant housing in Kentucky. These data were obtained through
+            <a href="http://factfinder.census.gov/" target="_blank">American Fact Finder</a>; 2010 Census, SF1 and have
+            been aggregated by county.</p>
 
-        <p>Select an attribute from the dropdown to explore its prevalence across the state. Click a county to view its name and percentage of the selected vacant housing attribute, or hover over a county to view the total number of each type of vacant housing in that county.</p>
+        <p>Select an attribute from the dropdown to explore its prevalence across the state. Click a county to view its
+            name and percentage of the selected vacant housing attribute, or hover over a county to view the total
+            number of each type of vacant housing in that county.</p>
 
     </footer>
 
@@ -163,13 +173,14 @@
         }
 
         // Create a new Leaflet map, passing map options, and assign it to the map variable
-        var map = L.map('map', options);        
+        var map = L.map('map', options);
 
         // Define global variables for the Leaflet geoJson data layer, the mapped attribute, the normalization attribute, and the county name
         var dataLayer, // Leaflet GeoJson layer
-            attribute = "VACANT_FOR", // assign attribute variable for choropleth map: housing units which are vacant and for rent
+            attribute =
+            "VACANT_FOR", // assign attribute variable for choropleth map: housing units which are vacant and for rent
             norm = "VACANT"; // assign normalization variable for choropleth map: total number of vacant housing units
-            county = "NAME"; // county name        
+        county = "NAME"; // county name        
 
         // Create the labels object to store meaningful labels for each attribute
         var labels = {
@@ -262,15 +273,15 @@
 
             // When the user hovers over any county in Kentucky
             dataLayer.on('mouseover', function () {
-                
+
                 // Use the JQuery show() method to show the info panel <div>
                 $(".info").show();
-                
+
             });
 
             // When the user hovers off of a county (or outside of Kentucky)
             dataLayer.on('mouseout', function () {
-                
+
                 // Use the JQuery hide() method to hide the info panel <div>
                 $(".info").hide();
 
@@ -323,19 +334,19 @@
             if (d <= breaks[0][1]) {
                 return '#f1eef6';
 
-            // Otherwise, if the normalized data value <= the upper value of the second cluster    
+                // Otherwise, if the normalized data value <= the upper value of the second cluster    
             } else if (d <= breaks[1][1]) {
                 return '#bdc9e1';
 
-            // Otherwise, if the normalized data value <= the upper value of the third cluster   
+                // Otherwise, if the normalized data value <= the upper value of the third cluster   
             } else if (d <= breaks[2][1]) {
                 return '#74a9cf';
 
-            // Otherwise, if the normalized data value <= the upper value of the fourth cluster   
+                // Otherwise, if the normalized data value <= the upper value of the fourth cluster   
             } else if (d <= breaks[3][1]) {
                 return '#2b8cbe';
 
-            // Otherwise, if the data value <= the upper value of the fifth cluster  
+                // Otherwise, if the data value <= the upper value of the fifth cluster  
             } else if (d <= breaks[4][1]) {
                 return '#045a8d';
             }
